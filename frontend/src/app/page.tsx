@@ -1,65 +1,181 @@
-import Image from "next/image";
+"use client";
+
+import { useState } from "react";
+import Link from "next/link";
+
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
 export default function Home() {
+  const [registerForm, setRegisterForm] = useState({
+    email: "",
+    password: "",
+    first_name: "",
+    last_name: "",
+    phone: "",
+    date_of_birth: "",
+  });
+  const [user, setUser] = useState<any | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  async function handleRegister(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/auth/register`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(registerForm),
+      });
+
+      if (!res.ok) {
+        const { message } = await res.json().catch(() => ({}));
+        throw new Error(message || "Registration failed");
+      }
+
+      const data = await res.json();
+      // Display returned user
+      setUser(data.user || null);
+    } catch (err: any) {
+      setError(err.message || String(err));
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+    <div className="min-h-screen bg-linear-to-br from-blue-50 to-indigo-100">
+      {/* Hero Section */}
+      <section className="relative bg-linear-to-r from-blue-600 to-indigo-700 text-white py-20">
+        <div className="container mx-auto px-6 text-center">
+          <h1 className="text-5xl font-bold mb-4">Welcome to Bharath Pharmacy</h1>
+          <p className="text-xl mb-8">Your trusted partner for health and wellness. Quality medicines and expert care.</p>
+          <div className="flex justify-center gap-4">
+            <button className="bg-white text-blue-600 px-8 py-3 rounded-full font-semibold hover:bg-gray-100 transition">
+              Learn More
+            </button>
+            <Link href="/login" className="bg-transparent border-2 border-white text-white px-8 py-3 rounded-full font-semibold hover:bg-white hover:text-blue-600 transition">
+              Login
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* About Section */}
+      <section className="py-16 bg-white">
+        <div className="container mx-auto px-6 text-center">
+          <h2 className="text-3xl font-bold mb-8 text-gray-800">About Us</h2>
+          <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+            Bharath Pharmacy has been serving the community for over 20 years, providing high-quality pharmaceuticals,
+            health products, and personalized care. Our mission is to improve health outcomes through reliable service
+            and expert advice.
           </p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+      </section>
+
+      {/* Registration Section */}
+      <section className="py-16 bg-gray-50">
+        <div className="container mx-auto px-6">
+          <div className="max-w-md mx-auto bg-white p-8 rounded-lg shadow-lg">
+            <h2 className="text-2xl font-bold mb-6 text-center text-gray-800">Register with Us</h2>
+
+            {user ? (
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold text-green-600">Registration Successful!</h3>
+                <div className="bg-gray-100 p-4 rounded">
+                  <h4 className="font-medium mb-2">User Details:</h4>
+                  <pre className="text-sm text-gray-700 whitespace-pre-wrap">
+                    {JSON.stringify(user, null, 2)}
+                  </pre>
+                </div>
+                <button
+                  className="w-full bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700 transition"
+                  onClick={() => setUser(null)}
+                >
+                  Register Another User
+                </button>
+              </div>
+            ) : (
+              <form onSubmit={handleRegister} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">First Name</label>
+                  <input
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    value={registerForm.first_name}
+                    onChange={(e) => setRegisterForm({ ...registerForm, first_name: e.target.value })}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Last Name</label>
+                  <input
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    value={registerForm.last_name}
+                    onChange={(e) => setRegisterForm({ ...registerForm, last_name: e.target.value })}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Email</label>
+                  <input
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    type="email"
+                    value={registerForm.email}
+                    onChange={(e) => setRegisterForm({ ...registerForm, email: e.target.value })}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Phone</label>
+                  <input
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    value={registerForm.phone}
+                    onChange={(e) => setRegisterForm({ ...registerForm, phone: e.target.value })}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Date of Birth</label>
+                  <input
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    type="date"
+                    value={registerForm.date_of_birth}
+                    onChange={(e) => setRegisterForm({ ...registerForm, date_of_birth: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Password</label>
+                  <input
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    type="password"
+                    value={registerForm.password}
+                    onChange={(e) => setRegisterForm({ ...registerForm, password: e.target.value })}
+                    required
+                  />
+                </div>
+
+                {error && <div className="text-sm text-red-600">{error}</div>}
+
+                <button
+                  className="w-full bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700 transition disabled:opacity-50"
+                  type="submit"
+                  disabled={loading}
+                >
+                  {loading ? "Registering..." : "Register"}
+                </button>
+              </form>
+            )}
+          </div>
         </div>
-      </main>
+      </section>
+
+      {/* Footer */}
+      <footer className="bg-gray-800 text-white py-8">
+        <div className="container mx-auto px-6 text-center">
+          <p>&copy; 2026 Bharath Pharmacy. All rights reserved.</p>
+        </div>
+      </footer>
     </div>
   );
 }
