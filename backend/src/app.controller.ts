@@ -8,7 +8,7 @@ export class AppController {
   @Get('db-health')
   async health() {
     // Tests DB connectivity
-    const result = await this.prisma.user.count();
+    const result = await this.prisma.users.count();
     return { ok: true, userCount: result };
   }
 }
