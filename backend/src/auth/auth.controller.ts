@@ -1,7 +1,9 @@
-import { Controller, Get, UseGuards, Req, Res, HttpStatus } from '@nestjs/common';
+import { Controller, Get, Post, Body, UseGuards, Req, Res, HttpStatus } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { GoogleAuthGuard } from './guards/google-auth.guard';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { RegisterDto } from './dto/register.dto';
+import { LoginDto } from './dto/login.dto';
 import { ConfigService } from '@nestjs/config';
 import type { Response } from 'express';
 
@@ -12,6 +14,19 @@ export class AuthController {
     private configService: ConfigService,
   ) {}
 
+  // Email/Password Registration
+  @Post('register')
+  async register(@Body() registerDto: RegisterDto) {
+    return this.authService.register(registerDto);
+  }
+
+  // Email/Password Login
+  @Post('login')
+  async login(@Body() loginDto: LoginDto) {
+    return this.authService.login(loginDto);
+  }
+
+  // Google OAuth Login
   @Get('google')
   @UseGuards(GoogleAuthGuard)
   async googleAuth() {
@@ -30,12 +45,14 @@ export class AuthController {
     );
   }
 
+  // Get Current User Profile
   @UseGuards(JwtAuthGuard)
   @Get('me')
   async getProfile(@Req() req) {
     return req.user;
   }
 
+  // Logout
   @Get('logout')
   async logout(@Res() res: Response) {
     // For stateless JWT, just return success
