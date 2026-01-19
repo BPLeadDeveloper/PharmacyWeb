@@ -1,63 +1,60 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
 export default function AuthCallback() {
-  const [status, setStatus] = useState("Processing...");
-  const [user, setUser] = useState<any | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const token = params.get("token") || params.get("access_token");
-    if (!token) {
-      setError("No token in callback URL");
-      setStatus("Failed");
-      return;
+    const token = searchParams.get("token");
+
+    if (token) {
+      // Store the token
+      localStorage.setItem("token", token);
+
+      // Fetch user profile
+      fetch(`${API_BASE}/auth/me`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+        .then(async (res) => {
+          if (res.ok) {
+            const user = await res.json();
+            // Redirect to home on success
+            router.push("/");
+          } else {
+            throw new Error("Failed to fetch user profile");
+          }
+        })
+        .catch((err) => {
+          setError(err.message);
+          // Remove invalid token
+          localStorage.removeItem("token");
+        });
+    } else {
+      setError("No token provided");
+      // Redirect to home after a delay
+      setTimeout(() => router.push("/"), 3000);
     }
-
-    localStorage.setItem("token", token);
-
-    // Fetch profile from backend
-    fetch(`${API_BASE}/auth/me`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then(async (res) => {
-        if (!res.ok) {
-          const body = await res.json().catch(() => ({}));
-          throw new Error(body.message || "Failed to fetch profile");
-        }
-        return res.json();
-      })
-      .then((data) => {
-        setUser(data);
-        setStatus("Success");
-        // Redirect to login page to show user details
-        setTimeout(() => router.push("/login"), 2000); // Delay to show success message
-      })
-      .catch((err) => {
-        setError(err.message || String(err));
-        setStatus("Failed");
-      });
-  }, []);
+  }, [router, searchParams]);
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="w-full max-w-xl rounded-lg bg-white p-8 shadow">
-        <h1 className="mb-4 text-2xl font-semibold">Auth callback</h1>
-        <p className="mb-4">Status: {status}</p>
-        {error && <div className="mb-4 text-red-600">{error}</div>}
-        {user && (
-          <div>
-            <h2 className="text-lg font-medium">Logged in user</h2>
-            <pre className="rounded bg-gray-100 p-3">{JSON.stringify(user, null, 2)}</pre>
-          </div>
+    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="max-w-md w-full bg-white p-8 rounded-lg shadow-lg text-center">
+        <h1 className="text-2xl font-bold mb-4">Authenticating...</h1>
+        {error ? (
+          <div className="text-red-600 mb-4">{error}</div>
+        ) : (
+          <div className="text-gray-600 mb-4">Please wait while we log you in.</div>
         )}
-      </main>
+        <div className="text-sm text-gray-500">
+          You will be redirected shortly.
+        </div>
+      </div>
     </div>
   );
 }

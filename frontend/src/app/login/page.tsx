@@ -2,10 +2,12 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
 export default function Login() {
+  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [user, setUser] = useState<any | null>(null);
@@ -54,16 +56,13 @@ export default function Login() {
         localStorage.setItem("token", data.access_token);
       }
       setUser(data.user || null);
+      // Redirect to home
+      router.push("/");
     } catch (err: any) {
       setError(err.message || String(err));
     } finally {
       setLoading(false);
     }
-  }
-
-  function handleGoogleLogin() {
-    // Open backend Google OAuth flow
-    window.location.href = `${API_BASE}/auth/google`;
   }
 
   return (
@@ -82,9 +81,13 @@ export default function Login() {
             </div>
             <button
               className="w-full bg-red-600 text-white py-2 px-4 rounded hover:bg-red-700 transition"
-              onClick={() => {
+              onClick={async () => {
+                try {
+                  await fetch(`${API_BASE}/auth/logout`, { method: "POST" });
+                } catch {}
                 localStorage.removeItem("token");
                 setUser(null);
+                router.push("/");
               }}
             >
               Logout
@@ -93,9 +96,9 @@ export default function Login() {
         ) : (
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700">Email</label>
+              <label className="block text-sm font-medium text-black">Email</label>
               <input
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-black"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -103,9 +106,9 @@ export default function Login() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700">Password</label>
+              <label className="block text-sm font-medium text-black">Password</label>
               <input
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-black"
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -126,10 +129,16 @@ export default function Login() {
             <button
               type="button"
               className="w-full bg-red-600 text-white py-2 px-4 rounded hover:bg-red-700 transition"
-              onClick={handleGoogleLogin}
+              onClick={() => {
+                window.location.href = `${API_BASE}/auth/google`;
+              }}
             >
-              Login with Google
+              Sign in with Google
             </button>
+
+            <div className="mt-4 text-center">
+          <Link href="/register" className="text-blue-600 hover:underline">Don't have an account? Register</Link>
+        </div>
           </form>
         )}
 
