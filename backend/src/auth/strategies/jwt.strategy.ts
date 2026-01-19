@@ -18,10 +18,14 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   async validate(payload: any) {
+    // payload contains: { sub: userId, email, roles }
     const user = await this.authService.validateUser(BigInt(payload.sub));
+    
     if (!user) {
       throw new UnauthorizedException();
     }
+    
+    // Return user object with roles
     return user;
   }
 }
