@@ -1,35 +1,23 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
-export default function Login() {
+export default function VerifyPhone() {
   const router = useRouter();
-  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
   const [showOtpInput, setShowOtpInput] = useState(false);
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [countdown, setCountdown] = useState(0);
-  const [isNewUser, setIsNewUser] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem("token");
-    if (token) {
-      fetch(`${API_BASE}/auth/me`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-        .then(async (res) => {
-          if (res.ok) {
-            router.push("/");
-          }
-        })
-        .catch(() => {
-          localStorage.removeItem("token");
-        });
+    if (!token) {
+      router.push("/login");
     }
   }, [router]);
 
@@ -48,14 +36,14 @@ export default function Login() {
 
     // Auto-focus next input
     if (value && index < 5) {
-      const nextInput = document.getElementById(`otp-${index + 1}`);
+      const nextInput = document.getElementById(`phone-otp-${index + 1}`);
       nextInput?.focus();
     }
   };
 
   const handleOtpKeyDown = (index: number, e: React.KeyboardEvent) => {
     if (e.key === "Backspace" && !otp[index] && index > 0) {
-      const prevInput = document.getElementById(`otp-${index - 1}`);
+      const prevInput = document.getElementById(`phone-otp-${index - 1}`);
       prevInput?.focus();
     }
   };
@@ -65,11 +53,23 @@ export default function Login() {
     setError(null);
     setLoading(true);
 
+    // Validate phone number (Indian format)
+    const phoneRegex = /^[6-9]\d{9}$/;
+    if (!phoneRegex.test(phone)) {
+      setError("Please enter a valid 10-digit Indian mobile number");
+      setLoading(false);
+      return;
+    }
+
     try {
-      const res = await fetch(`${API_BASE}/auth/send-email-otp`, {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${API_BASE}/auth/send-phone-otp`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ phone: `+91${phone}` }),
       });
 
       if (!res.ok) {
@@ -77,8 +77,6 @@ export default function Login() {
         throw new Error(message || "Failed to send OTP");
       }
 
-      const data = await res.json();
-      setIsNewUser(data.isNewUser || false);
       setShowOtpInput(true);
       setCountdown(60);
     } catch (err: any) {
@@ -101,10 +99,14 @@ export default function Login() {
     }
 
     try {
-      const res = await fetch(`${API_BASE}/auth/verify-email-otp`, {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${API_BASE}/auth/verify-phone-otp`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, otp: otpCode }),
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ phone: `+91${phone}`, otp: otpCode }),
       });
 
       if (!res.ok) {
@@ -112,18 +114,8 @@ export default function Login() {
         throw new Error(message || "Invalid OTP");
       }
 
-      const data = await res.json();
-      
-      if (data.access_token) {
-        localStorage.setItem("token", data.access_token);
-      }
-
-      // Check if user needs to complete profile
-      if (data.needsProfileCompletion || isNewUser) {
-        router.push("/verify-phone");
-      } else {
-        router.push("/");
-      }
+      // Redirect to profile completion page
+      router.push("/complete-profile");
     } catch (err: any) {
       setError(err.message || String(err));
     } finally {
@@ -137,10 +129,14 @@ export default function Login() {
     setLoading(true);
 
     try {
-      const res = await fetch(`${API_BASE}/auth/send-email-otp`, {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${API_BASE}/auth/send-phone-otp`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ phone: `+91${phone}` }),
       });
 
       if (!res.ok) {
@@ -157,25 +153,12 @@ export default function Login() {
     }
   }
 
-  function handleGoogleLogin() {
-    window.location.href = `${API_BASE}/auth/google`;
-  }
-
   return (
     <div className="min-h-screen bg-linear-to-br from-[#e8f4f8] to-[#d4e8ed] flex items-center justify-center p-4">
-      {/* Login Modal */}
       <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden">
-        {/* Header with Logo */}
-        <div className="bg-[#f57224] p-6 text-center relative">
-          <button 
-            onClick={() => router.push("/")}
-            className="absolute top-4 right-4 text-white hover:bg-white/20 rounded-full p-2 transition"
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-          <div className="flex items-center justify-center mb-2">
+        {/* Header */}
+        <div className="bg-[#02475b] p-6 text-center">
+          <div className="flex items-center justify-center mb-4">
             <div className="w-14 h-14 bg-white rounded-lg flex items-center justify-center mr-3">
               <span className="text-[#02475b] font-bold text-2xl">B</span>
             </div>
@@ -184,12 +167,32 @@ export default function Login() {
               <span className="text-sm opacity-80">24|7</span>
             </div>
           </div>
-          <h1 className="text-white text-xl font-bold mt-2">Login for Best Offer</h1>
-          
-          {/* Decorative Phone Image Placeholder */}
-          <div className="mt-4 flex justify-center">
-            <div className="bg-white/20 rounded-lg p-3">
-              <span className="text-5xl">📱</span>
+          <h1 className="text-white text-xl font-bold">Verify Your Mobile Number</h1>
+          <p className="text-gray-300 text-sm mt-1">For secure transactions and updates</p>
+        </div>
+
+        {/* Progress Indicator */}
+        <div className="px-6 pt-6">
+          <div className="flex items-center justify-center space-x-2">
+            <div className="flex items-center">
+              <div className="w-8 h-8 rounded-full bg-green-500 text-white flex items-center justify-center text-sm font-semibold">
+                ✓
+              </div>
+              <span className="ml-2 text-sm text-gray-600">Email</span>
+            </div>
+            <div className="w-12 h-1 bg-[#f57224] rounded"></div>
+            <div className="flex items-center">
+              <div className={`w-8 h-8 rounded-full ${showOtpInput ? 'bg-[#f57224]' : 'bg-gray-200'} text-white flex items-center justify-center text-sm font-semibold`}>
+                2
+              </div>
+              <span className="ml-2 text-sm text-gray-600">Phone</span>
+            </div>
+            <div className="w-12 h-1 bg-gray-200 rounded"></div>
+            <div className="flex items-center">
+              <div className="w-8 h-8 rounded-full bg-gray-200 text-gray-500 flex items-center justify-center text-sm font-semibold">
+                3
+              </div>
+              <span className="ml-2 text-sm text-gray-600">Profile</span>
             </div>
           </div>
         </div>
@@ -199,28 +202,26 @@ export default function Login() {
           {!showOtpInput ? (
             <>
               <h2 className="text-[#02475b] text-lg font-semibold mb-4">
-                Please enter your email to login
+                Enter your mobile number
               </h2>
 
               <form onSubmit={handleSendOtp} className="space-y-4">
                 <div className="relative">
                   <div className="flex items-center border-2 border-gray-200 rounded-lg focus-within:border-[#f57224] transition">
-                    <span className="pl-4 text-gray-400">
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                      </svg>
+                    <span className="pl-4 text-gray-700 font-semibold border-r pr-3 py-4">
+                      +91
                     </span>
                     <input
-                      type="email"
-                      placeholder="Enter your email address"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
+                      type="tel"
+                      placeholder="Enter 10-digit mobile number"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
                       className="flex-1 px-3 py-4 outline-none text-gray-800"
                       required
                     />
                     <button
                       type="submit"
-                      disabled={loading || !email}
+                      disabled={loading || phone.length !== 10}
                       className="bg-[#f57224] hover:bg-[#e56213] disabled:bg-gray-300 text-white p-3 m-1 rounded-lg transition"
                     >
                       <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -231,7 +232,7 @@ export default function Login() {
                 </div>
 
                 <p className="text-sm text-gray-500">
-                  OTP will be sent to this email address
+                  OTP will be sent via SMS and WhatsApp to this number
                 </p>
 
                 {error && (
@@ -240,48 +241,20 @@ export default function Login() {
                   </div>
                 )}
 
-                <p className="text-xs text-gray-500">
-                  By signing up, I agree to the{" "}
-                  <Link href="/privacy-policy" className="text-[#02475b] underline">Privacy Policy</Link>,{" "}
-                  <Link href="/terms" className="text-[#02475b] underline">Terms and Conditions</Link>{" "}
-                  of Bharath Pharmacy.
-                </p>
-              </form>
-
-              {/* Divider */}
-              <div className="my-6 flex items-center">
-                <div className="flex-1 border-t border-gray-200"></div>
-                <span className="px-4 text-gray-500 text-sm">OR</span>
-                <div className="flex-1 border-t border-gray-200"></div>
-              </div>
-
-              {/* Google Login */}
-              <button
-                onClick={handleGoogleLogin}
-                className="w-full flex items-center justify-center space-x-3 border-2 border-gray-200 rounded-lg py-3 hover:bg-gray-50 transition"
-              >
-                <svg className="w-6 h-6" viewBox="0 0 24 24">
-                  <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                  <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                  <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                  <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-                </svg>
-                <span className="text-gray-700 font-medium">Continue with Google</span>
-              </button>
-
-              {/* Free Delivery Banner */}
-              <div className="mt-6 bg-[#fff8e7] rounded-lg p-4 flex items-center space-x-3">
-                <span className="text-4xl">🛵</span>
-                <div>
-                  <p className="font-semibold text-[#02475b]">Free delivery | FREEDEL</p>
-                  <p className="text-sm text-gray-600">Available in Delhi NCR, Hyderabad, Bangalore, Chennai, Kolkata & more</p>
+                <div className="bg-blue-50 rounded-lg p-4 flex items-start space-x-3">
+                  <span className="text-blue-500 text-xl">ℹ️</span>
+                  <div>
+                    <p className="text-sm text-gray-700">
+                      We need your mobile number to:
+                    </p>
+                    <ul className="text-xs text-gray-600 mt-1 space-y-1">
+                      <li>• Send order updates and delivery notifications</li>
+                      <li>• Contact you regarding prescriptions</li>
+                      <li>• Provide 24/7 customer support</li>
+                    </ul>
+                  </div>
                 </div>
-              </div>
-
-              {/* Exciting Offers */}
-              <div className="mt-4 bg-[#02475b] text-white text-center py-3 rounded-lg">
-                <p className="font-semibold">EXCITING OFFERS FOR FIRST TIME USERS</p>
-              </div>
+              </form>
             </>
           ) : (
             <>
@@ -297,14 +270,14 @@ export default function Login() {
                 <svg className="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                 </svg>
-                Back
+                Change Number
               </button>
 
               <h2 className="text-[#02475b] text-lg font-semibold mb-2">
-                Verify your email
+                Verify your mobile number
               </h2>
               <p className="text-gray-600 mb-6">
-                We've sent a 6-digit OTP to <span className="font-semibold">{email}</span>
+                We've sent a 6-digit OTP to <span className="font-semibold">+91 {phone}</span>
               </p>
 
               <form onSubmit={handleVerifyOtp} className="space-y-6">
@@ -313,7 +286,7 @@ export default function Login() {
                   {otp.map((digit, index) => (
                     <input
                       key={index}
-                      id={`otp-${index}`}
+                      id={`phone-otp-${index}`}
                       type="text"
                       inputMode="numeric"
                       maxLength={1}
@@ -336,7 +309,7 @@ export default function Login() {
                   disabled={loading || otp.join("").length !== 6}
                   className="w-full bg-[#f57224] hover:bg-[#e56213] disabled:bg-gray-300 text-white py-4 rounded-lg font-semibold transition"
                 >
-                  {loading ? "Verifying..." : "Verify OTP"}
+                  {loading ? "Verifying..." : "Verify & Continue"}
                 </button>
 
                 <div className="text-center">

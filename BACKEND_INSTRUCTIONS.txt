@@ -1,0 +1,779 @@
+================================================================================
+                    BACKEND API REQUIREMENTS FOR BHARATH PHARMACY
+                    Frontend-Backend Integration Guide
+================================================================================
+
+This document outlines the backend API endpoints and their expected behavior 
+required to support the new frontend authentication and user management flow.
+
+================================================================================
+                              TABLE OF CONTENTS
+================================================================================
+
+1. Authentication Flow Overview
+2. Required API Endpoints (Auth)
+3. Required API Endpoints (Products & Data)
+4. Database Schema Updates
+5. Email OTP Service
+6. Phone OTP Service (SMS)
+7. Google OAuth Integration
+8. Error Handling
+9. Security Considerations
+
+================================================================================
+                        1. AUTHENTICATION FLOW OVERVIEW
+================================================================================
+
+The new authentication flow follows this sequence:
+
+For Email Login/Registration:
+1. User enters email on login page
+2. Backend sends OTP to email
+3. User enters OTP to verify email
+4. If new user -> redirect to phone verification
+5. User enters phone number
+6. Backend sends OTP via SMS
+7. User enters SMS OTP to verify phone
+8. Redirect to profile completion page
+9. User fills profile details
+10. Registration complete -> redirect to home
+
+For Google OAuth:
+1. User clicks "Continue with Google"
+2. Backend handles OAuth flow
+3. If new user -> redirect with flags for phone verification
+4. User verifies phone and completes profile
+5. Registration complete -> redirect to home
+
+================================================================================
+                        2. REQUIRED API ENDPOINTS (AUTH)
+================================================================================
+
+(All authentication endpoints documented below - same as before)
+
+--------------------------------------------------------------------------------
+POST /auth/send-email-otp
+--------------------------------------------------------------------------------
+Description: Send OTP to user's email address for verification
+
+Request Body:
+{
+  "email": "user@example.com"
+}
+
+Response (Success - 200):
+{
+  "success": true,
+  "message": "OTP sent successfully",
+  "isNewUser": true/false  // Whether this email is new to the system
+}
+
+Response (Error - 400/500):
+{
+  "statusCode": 400,
+  "message": "Invalid email format" | "Too many OTP requests. Please try again later."
+}
+
+Notes:
+- Generate a 6-digit numeric OTP
+- Store OTP with expiry (e.g., 10 minutes) in database or cache (Redis)
+- Rate limit: Max 5 OTP requests per email per hour
+- Send email using configured email service (SendGrid, AWS SES, etc.)
+
+--------------------------------------------------------------------------------
+POST /auth/verify-email-otp
+--------------------------------------------------------------------------------
+Description: Verify the OTP sent to user's email
+
+Request Body:
+{
+  "email": "user@example.com",
+  "otp": "123456"
+}
+
+Response (Success - 200):
+{
+  "success": true,
+  "access_token": "jwt_token_here",
+  "needsProfileCompletion": true/false,
+  "needsPhoneVerification": true/false,
+  "user": {
+    "user_id": 1,
+    "email": "user@example.com",
+    "is_email_verified": true,
+    "is_phone_verified": false,
+    "first_name": null,
+    "last_name": null
+  }
+}
+
+Response (Error - 400/401):
+{
+  "statusCode": 401,
+  "message": "Invalid OTP" | "OTP expired"
+}
+
+Notes:
+- If email doesn't exist, create a new user with email only
+- Mark is_email_verified = true
+- Generate JWT token with user_id
+- Determine needsProfileCompletion based on whether first_name exists
+- Determine needsPhoneVerification based on is_phone_verified
+
+--------------------------------------------------------------------------------
+POST /auth/send-phone-otp
+--------------------------------------------------------------------------------
+Description: Send OTP via SMS to user's phone number
+
+Request Headers:
+Authorization: Bearer <jwt_token>
+
+Request Body:
+{
+  "phone": "+919876543210"  // Phone with country code
+}
+
+Response (Success - 200):
+{
+  "success": true,
+  "message": "OTP sent to your mobile number"
+}
+
+Response (Error - 400/500):
+{
+  "statusCode": 400,
+  "message": "Invalid phone number" | "Phone number already registered"
+}
+
+Notes:
+- Validate Indian phone number format (+91XXXXXXXXXX)
+- Generate 6-digit OTP
+- Send via SMS service (Twilio, MSG91, etc.)
+- Rate limit: Max 5 OTP requests per phone per hour
+- Store OTP with expiry (e.g., 10 minutes)
+
+--------------------------------------------------------------------------------
+POST /auth/verify-phone-otp
+--------------------------------------------------------------------------------
+Description: Verify the SMS OTP and update user's phone
+
+Request Headers:
+Authorization: Bearer <jwt_token>
+
+Request Body:
+{
+  "phone": "+919876543210",
+  "otp": "123456"
+}
+
+Response (Success - 200):
+{
+  "success": true,
+  "message": "Phone number verified successfully",
+  "user": {
+    "user_id": 1,
+    "email": "user@example.com",
+    "phone": "+919876543210",
+    "is_phone_verified": true
+  }
+}
+
+Response (Error - 400/401):
+{
+  "statusCode": 401,
+  "message": "Invalid OTP" | "OTP expired"
+}
+
+Notes:
+- Update user's phone number in database
+- Mark is_phone_verified = true
+- Check if phone is already registered to another user
+
+--------------------------------------------------------------------------------
+POST /auth/complete-profile
+--------------------------------------------------------------------------------
+Description: Complete user profile after verification
+
+Request Headers:
+Authorization: Bearer <jwt_token>
+
+Request Body:
+{
+  "first_name": "John",
+  "last_name": "Doe",
+  "date_of_birth": "1990-01-15",
+  "gender": "Male",
+  "emergency_contact_name": "Jane Doe",      // Optional
+  "emergency_contact_phone": "+919876543211" // Optional
+}
+
+Response (Success - 200):
+{
+  "success": true,
+  "message": "Profile completed successfully",
+  "user": {
+    "user_id": 1,
+    "email": "user@example.com",
+    "phone": "+919876543210",
+    "first_name": "John",
+    "last_name": "Doe",
+    "date_of_birth": "1990-01-15",
+    "is_email_verified": true,
+    "is_phone_verified": true
+  }
+}
+
+Response (Error - 400):
+{
+  "statusCode": 400,
+  "message": "First name is required" | "Invalid date of birth"
+}
+
+Notes:
+- Update users table with first_name, last_name, date_of_birth
+- Create entry in customers table if not exists
+- Update emergency contact info in customers table
+- Validate age >= 18 years
+
+--------------------------------------------------------------------------------
+GET /auth/me
+--------------------------------------------------------------------------------
+Description: Get current authenticated user's profile
+
+Request Headers:
+Authorization: Bearer <jwt_token>
+
+Response (Success - 200):
+{
+  "user_id": 1,
+  "email": "user@example.com",
+  "phone": "+919876543210",
+  "first_name": "John",
+  "last_name": "Doe",
+  "date_of_birth": "1990-01-15",
+  "is_email_verified": true,
+  "is_phone_verified": true,
+  "is_active": true,
+  "created_at": "2026-01-28T10:00:00Z",
+  "customer": {
+    "customer_id": 1,
+    "emergency_contact_name": "Jane Doe",
+    "emergency_contact_phone": "+919876543211"
+  }
+}
+
+Response (Error - 401):
+{
+  "statusCode": 401,
+  "message": "Unauthorized"
+}
+
+--------------------------------------------------------------------------------
+GET /auth/google
+--------------------------------------------------------------------------------
+Description: Initiate Google OAuth flow
+
+Notes:
+- Redirect to Google OAuth consent screen
+- Configure callback URL: /auth/google/callback
+
+--------------------------------------------------------------------------------
+GET /auth/google/callback
+--------------------------------------------------------------------------------
+Description: Google OAuth callback handler
+
+Notes:
+- Exchange authorization code for tokens
+- Get user info from Google
+- Create user if not exists (using Google email)
+- Mark is_email_verified = true (Google verifies emails)
+- Generate JWT token
+- Redirect to frontend: /auth/callback?token=<jwt>&needsPhoneVerification=true&needsProfileCompletion=true
+
+
+
+================================================================================
+                    3. REQUIRED API ENDPOINTS (PRODUCTS & DATA)
+================================================================================
+
+Since all product data is now fetched from the database instead of being 
+hardcoded, these endpoints are REQUIRED for the landing page and product pages.
+
+---
+
+1. GET /api/categories
+   Purpose: Fetch health condition categories for "Browse by Health Conditions" section
+   Auth: Not required
+   Query Parameters:
+     - limit (optional, default: 20, max: 100)
+     - offset (optional, default: 0)
+   Response:
+     {
+       "data": [
+         {
+           "category_id": 1,
+           "category_name": "Diabetes Care",
+           "description": "Products for diabetes management"
+         }
+       ],
+       "pagination": {
+         "total": 10,
+         "limit": 20,
+         "offset": 0,
+         "hasMore": false
+       }
+     }
+
+---
+
+2. GET /api/products
+   Purpose: Fetch featured products for landing page and search results
+   Auth: Not required
+   Query Parameters:
+     - featured (optional, boolean) - Get only featured products
+     - category_id (optional, int)
+     - brand_id (optional, int)
+     - limit (optional, default: 20, max: 100)
+     - offset (optional, default: 0)
+     - sort_by (optional: "price", "created_at", "name")
+     - sort_order (optional: "ASC", "DESC")
+   Response:
+     {
+       "data": [
+         {
+           "product_id": 1,
+           "product_name": "Dettol Antiseptic Liquid 550ml",
+           "price": 99,
+           "original_price": 215,
+           "discount": "54%",
+           "display_image_emoji": "🧴",
+           "category_id": 1,
+           "brand_id": 5,
+           "is_active": true
+         }
+       ],
+       "pagination": {
+         "total": 150,
+         "limit": 20,
+         "offset": 0,
+         "hasMore": true
+       }
+     }
+   
+   Example Requests:
+     GET /api/products?featured=true&limit=5
+     GET /api/products?category_id=1&limit=20
+     GET /api/products?brand_id=5&sort_by=price&sort_order=ASC
+
+---
+
+3. GET /api/products/:product_id
+   Purpose: Fetch single product details
+   Auth: Not required
+   Response:
+     {
+       "product_id": 1,
+       "product_name": "Dettol Antiseptic Liquid 550ml",
+       "generic_name": "Chloroxylenol",
+       "price": 99,
+       "original_price": 215,
+       "discount": "54%",
+       "display_image_emoji": "🧴",
+       "category_id": 1,
+       "brand_id": 5,
+       "description": "Antiseptic liquid for surface cleaning",
+       "is_active": true,
+       "created_at": "2025-01-28T10:00:00Z"
+     }
+
+---
+
+4. GET /api/products/search
+   Purpose: Search products by name or description
+   Auth: Not required
+   Query Parameters:
+     - query (required, string)
+     - limit (optional, default: 20)
+     - offset (optional, default: 0)
+   Response:
+     {
+       "data": [
+         {
+           "product_id": 3,
+           "product_name": "Himalaya Neem Face Wash 200ml",
+           "price": 99,
+           "original_price": 175,
+           "display_image_emoji": "🌿"
+         }
+       ]
+     }
+
+---
+
+5. GET /api/brands
+   Purpose: Fetch all active brands for "Shop By Brand" section
+   Auth: Not required
+   Query Parameters:
+     - limit (optional, default: 20, max: 100)
+     - offset (optional, default: 0)
+     - is_active (optional, boolean, default: true)
+   Response:
+     {
+       "data": [
+         {
+           "brand_id": 1,
+           "brand_name": "Himalaya",
+           "origin_country": "India",
+           "web_url": "https://himalayausa.com"
+         }
+       ],
+       "pagination": {
+         "total": 50,
+         "limit": 20,
+         "offset": 0,
+         "hasMore": true
+       }
+     }
+
+---
+
+6. GET /api/brands/:brand_id
+   Purpose: Fetch single brand details
+   Auth: Not required
+   Response:
+     {
+       "brand_id": 1,
+       "brand_name": "Himalaya",
+       "origin_country": "India",
+       "manufacturer_name": "The Himalaya Drug Company",
+       "web_url": "https://himalayausa.com",
+       "is_active": true
+     }
+
+---
+
+7. GET /api/brands/:brand_id/products
+   Purpose: Fetch all products of a specific brand
+   Auth: Not required
+   Query Parameters:
+     - limit (optional, default: 50)
+     - offset (optional, default: 0)
+   Response:
+     {
+       "data": [
+         {
+           "product_id": 1,
+           "product_name": "Himalaya Neem Face Wash 200ml",
+           "price": 99,
+           "display_image_emoji": "🌿"
+         }
+       ]
+     }
+
+---
+
+8. GET /api/categories/:category_id
+   Purpose: Fetch single category details
+   Auth: Not required
+   Response:
+     {
+       "category_id": 1,
+       "category_name": "Diabetes Care",
+       "description": "Products for diabetes management",
+       "product_count": 45
+     }
+
+---
+
+9. GET /api/categories/:category_id/products
+   Purpose: Fetch all products in a category
+   Auth: Not required
+   Query Parameters:
+     - limit (optional, default: 50)
+     - offset (optional, default: 0)
+     - sort_by (optional)
+   Response:
+     {
+       "data": [
+         {
+           "product_id": 1,
+           "product_name": "Product Name",
+           "price": 299,
+           "original_price": 500,
+           "display_image_emoji": "🩸"
+         }
+       ]
+     }
+
+---
+
+10. GET /api/lab-tests
+    Purpose: Fetch lab tests for "Popular Lab Tests" section
+    Auth: Not required
+    Query Parameters:
+      - limit (optional, default: 20, max: 100)
+      - offset (optional, default: 0)
+      - test_type (optional, string) - Filter by test type
+    Response:
+      {
+        "data": [
+          {
+            "lab_test_id": 1,
+            "test_name": "CBC Test Complete",
+            "price": 299,
+            "original_price": 500,
+            "test_type": "Blood Test",
+            "home_sample": true,
+            "description": "Complete Blood Count"
+          }
+        ],
+        "pagination": {
+          "total": 20,
+          "limit": 20,
+          "offset": 0,
+          "hasMore": false
+        }
+      }
+
+---
+
+11. GET /api/lab-tests/:lab_test_id
+    Purpose: Fetch single lab test details
+    Auth: Not required
+    Response:
+      {
+        "lab_test_id": 1,
+        "test_name": "CBC Test Complete",
+        "price": 299,
+        "original_price": 500,
+        "test_type": "Blood Test",
+        "home_sample": true,
+        "description": "Complete Blood Count with differential",
+        "is_active": true
+      }
+
+================================================================================
+                        4. DATABASE SCHEMA UPDATES
+================================================================================
+
+To support the dynamic data fetching in the frontend, the following schema changes are required:
+
+1. Add the following fields to the products table:
+   - is_featured: Boolean (default: false) - For featured products on landing page
+   - display_image_emoji: String (varchar(10)) - Emoji representation for products
+
+2. Add a new lab_tests table for lab test data:
+
+```sql
+CREATE TABLE lab_tests (
+  lab_test_id BIGSERIAL PRIMARY KEY,
+  test_name VARCHAR(255) NOT NULL,
+  description TEXT,
+  price DECIMAL(10,2) NOT NULL,
+  original_price DECIMAL(10,2),
+  test_type VARCHAR(100) NOT NULL,
+  home_sample BOOLEAN DEFAULT true,
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+```
+
+3. Populate sample data for categories, brands, products, and lab_tests (see SAMPLE_DATA.sql for examples)
+
+4. Ensure warehouse_inventory table has selling_price and discount_percentage fields for pricing calculations
+
+================================================================================
+                        4. EMAIL OTP SERVICE
+================================================================================
+
+Requirements:
+- Integration with email service (SendGrid, AWS SES, Nodemailer, etc.)
+- HTML email template for OTP
+
+Example email template:
+```
+Subject: Your Bharath Pharmacy verification code is {OTP}
+
+<html>
+<body>
+  <h2>Verify your email</h2>
+  <p>Your verification code is:</p>
+  <h1 style="color: #f57224; font-size: 32px;">{OTP}</h1>
+  <p>This code will expire in 10 minutes.</p>
+  <p>If you didn't request this code, please ignore this email.</p>
+  <br>
+  <p>- Bharath Pharmacy Team</p>
+</body>
+</html>
+```
+
+Environment variables needed:
+- EMAIL_SERVICE_API_KEY
+- EMAIL_FROM_ADDRESS
+- EMAIL_FROM_NAME
+
+================================================================================
+                        5. PHONE OTP SERVICE (SMS)
+================================================================================
+
+Requirements:
+- Integration with SMS gateway (Twilio, MSG91, Gupshup, etc.)
+- SMS template for OTP
+
+Example SMS template:
+```
+Your Bharath Pharmacy verification code is {OTP}. Valid for 10 minutes. Do not share with anyone.
+```
+
+For Indian numbers, consider:
+- MSG91 (popular in India, supports DLT registration)
+- Twilio
+- Gupshup
+- AWS SNS
+
+Environment variables needed:
+- SMS_SERVICE_API_KEY
+- SMS_SERVICE_SENDER_ID
+- SMS_TEMPLATE_ID (required for DLT compliance in India)
+
+DLT Registration (India):
+- Register with DLT platform (e.g., Jio, BSNL, Airtel)
+- Register sender ID (e.g., "BPHARM")
+- Register message templates
+- Get Template ID for each template
+
+================================================================================
+                        6. GOOGLE OAUTH INTEGRATION
+================================================================================
+
+Setup:
+1. Create project in Google Cloud Console
+2. Enable Google+ API
+3. Create OAuth 2.0 credentials
+4. Add authorized redirect URI: {BACKEND_URL}/auth/google/callback
+
+Environment variables:
+- GOOGLE_CLIENT_ID
+- GOOGLE_CLIENT_SECRET
+- GOOGLE_CALLBACK_URL
+
+Flow:
+1. User clicks Google login
+2. Redirect to Google consent screen
+3. User grants permission
+4. Google redirects back with auth code
+5. Exchange code for tokens
+6. Get user profile from Google
+7. Create/update user in database
+8. Generate JWT and redirect to frontend
+
+Frontend redirect URL format:
+{FRONTEND_URL}/auth/callback?token={JWT}&needsPhoneVerification={true/false}&needsProfileCompletion={true/false}
+
+================================================================================
+                        7. ERROR HANDLING
+================================================================================
+
+Standard error response format:
+{
+  "statusCode": 400/401/403/404/500,
+  "message": "Human readable error message",
+  "error": "Error type (optional)"
+}
+
+Common error codes:
+- 400: Bad Request (validation errors)
+- 401: Unauthorized (invalid/expired token)
+- 403: Forbidden (access denied)
+- 404: Not Found
+- 429: Too Many Requests (rate limiting)
+- 500: Internal Server Error
+
+================================================================================
+                        8. SECURITY CONSIDERATIONS
+================================================================================
+
+1. OTP Security:
+   - Use cryptographically secure random number generator
+   - 6 digits minimum
+   - Max 3 verification attempts per OTP
+   - Lock account after 5 failed attempts in 15 minutes
+   - OTP expires in 10 minutes
+
+2. Rate Limiting:
+   - /send-email-otp: 5 requests per hour per email
+   - /send-phone-otp: 5 requests per hour per phone
+   - /verify-*-otp: 10 requests per hour per identifier
+
+3. JWT Security:
+   - Use strong secret key (256 bits minimum)
+   - Token expiry: 7 days (or configurable)
+   - Include user_id and email in payload
+   - Use HS256 or RS256 algorithm
+
+4. Input Validation:
+   - Validate email format
+   - Validate phone format (Indian: +91XXXXXXXXXX)
+   - Sanitize all inputs
+   - Validate date of birth (age >= 18)
+
+5. CORS:
+   - Allow only frontend origin
+   - Configure proper headers
+
+6. HTTPS:
+   - All endpoints must use HTTPS in production
+
+================================================================================
+                        SUMMARY OF NEW ENDPOINTS
+================================================================================
+
+| Method | Endpoint                | Auth Required | Description              |
+|--------|------------------------|---------------|--------------------------|
+| POST   | /auth/send-email-otp   | No            | Send OTP to email        |
+| POST   | /auth/verify-email-otp | No            | Verify email OTP         |
+| POST   | /auth/send-phone-otp   | Yes           | Send OTP to phone        |
+| POST   | /auth/verify-phone-otp | Yes           | Verify phone OTP         |
+| POST   | /auth/complete-profile | Yes           | Complete user profile    |
+| GET    | /auth/me               | Yes           | Get user profile         |
+| GET    | /auth/google           | No            | Initiate Google OAuth    |
+| GET    | /auth/google/callback  | No            | Google OAuth callback    |
+
+================================================================================
+                        ENVIRONMENT VARIABLES NEEDED
+================================================================================
+
+# Database
+DATABASE_URL=postgresql://user:password@localhost:5432/pharmacy
+
+# JWT
+JWT_SECRET=your-256-bit-secret-key
+JWT_EXPIRY=7d
+
+# Email Service (SendGrid example)
+SENDGRID_API_KEY=SG.xxxxx
+EMAIL_FROM_ADDRESS=noreply@bharathpharmacy.com
+EMAIL_FROM_NAME=Bharath Pharmacy
+
+# SMS Service (MSG91 example)
+MSG91_API_KEY=xxxxx
+MSG91_SENDER_ID=BPHARM
+MSG91_TEMPLATE_ID=xxxxx
+
+# Google OAuth
+GOOGLE_CLIENT_ID=xxxxx.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=xxxxx
+GOOGLE_CALLBACK_URL=http://localhost:3000/auth/google/callback
+
+# Frontend URL
+FRONTEND_URL=http://localhost:5173
+
+# Rate Limiting (optional, can use defaults)
+OTP_MAX_ATTEMPTS=3
+OTP_EXPIRY_MINUTES=10
+OTP_RATE_LIMIT_HOUR=5
+
+================================================================================
+                              END OF DOCUMENT
+================================================================================
