@@ -1,8 +1,8 @@
-import { Controller, Delete, ForbiddenException, Get, Patch, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Patch, Post, UseGuards } from "@nestjs/common";
 import { ProductsService } from "./products.service";
-import { Roles } from "src/decorators/roles.decorator";
-import { JwtAuthGuard } from "src/auth/guards/jwt-auth.guard";
-import { RolesGuard } from "src/auth/guards/roles.guard";
+import { Roles } from "src/decorators/index";
+import { JwtAuthGuard, RolesGuard } from "src/auth/guards/index";
+import { AddBrandDTORequest, AddBrandDTOReturn } from "./dto/index";
 
 
 
@@ -10,13 +10,13 @@ import { RolesGuard } from "src/auth/guards/roles.guard";
 export class ProductsController {
     constructor(
         private productsService: ProductsService
-    ) {}
+    ) { }
 
     @Post('create-brand')
     @UseGuards(JwtAuthGuard, RolesGuard)
     @Roles('ADMIN')
-    createBrand() {
-        return this.productsService.createBrands();
+    createBrand(@Body() addBrandDTO: AddBrandDTORequest): Promise<AddBrandDTOReturn> {
+        return this.productsService.createBrands(addBrandDTO);
     }
 
     @Patch('update-brand')
