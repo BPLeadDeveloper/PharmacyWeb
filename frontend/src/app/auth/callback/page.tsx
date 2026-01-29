@@ -20,7 +20,7 @@ function AuthCallbackContent() {
     // Handle OAuth errors (e.g., access_denied)
     if (error) {
       setError(`Authentication failed: ${error}`);
-      setTimeout(() => router.push("/login"), 2000);
+      setTimeout(() => router.push("/"), 2000);
       return;
     }
 
@@ -37,13 +37,8 @@ function AuthCallbackContent() {
           if (res.ok) {
             const user = await res.json();
             
-            // Check if phone verification is needed
-            if (needsPhoneVerification === "true" || !user.is_phone_verified) {
-              setStatus("Redirecting to phone verification...");
-              setTimeout(() => router.push("/verify-phone"), 1000);
-            }
             // Check if profile completion is needed
-            else if (needsProfileCompletion === "true" || !user.first_name) {
+            if (needsProfileCompletion === "true" || !user.first_name) {
               setStatus("Redirecting to complete your profile...");
               setTimeout(() => router.push("/complete-profile"), 1000);
             }
@@ -60,12 +55,12 @@ function AuthCallbackContent() {
           setError(err.message);
           // Remove invalid token
           localStorage.removeItem("token");
-          setTimeout(() => router.push("/login"), 3000);
+          setTimeout(() => router.push("/"), 3000);
         });
     } else {
       setError("No authentication token received");
-      // Redirect to login after a delay
-      setTimeout(() => router.push("/login"), 3000);
+      // Redirect to home after a delay
+      setTimeout(() => router.push("/"), 3000);
     }
   }, [router, searchParams]);
 

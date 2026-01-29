@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import LoginModal from "./LoginModal";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
@@ -19,6 +20,7 @@ export default function Header() {
   const [searchQuery, setSearchQuery] = useState("");
   const [showDropdown, setShowDropdown] = useState(false);
   const [cartCount, setCartCount] = useState(0);
+  const [showLoginModal, setShowLoginModal] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -67,7 +69,8 @@ export default function Header() {
   ];
 
   return (
-    <header className="sticky top-0 z-50 bg-white shadow-sm">
+    <>
+      <header className="sticky top-0 z-50 bg-white shadow-sm">
       {/* Top Header */}
       <div className="border-b border-gray-100">
         <div className="container mx-auto px-4 py-3">
@@ -166,15 +169,15 @@ export default function Header() {
                   )}
                 </div>
               ) : (
-                <Link
-                  href="/login"
+                <button
+                  onClick={() => setShowLoginModal(true)}
                   className="flex items-center space-x-2 px-4 py-2 border border-[#02475b] text-[#02475b] rounded-lg hover:bg-[#02475b] hover:text-white transition"
                 >
                   <span>Login</span>
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                   </svg>
-                </Link>
+                </button>
               )}
             </div>
           </div>
@@ -224,5 +227,11 @@ export default function Header() {
         </div>
       </div>
     </header>
+
+    <LoginModal
+      isOpen={showLoginModal}
+      onClose={() => setShowLoginModal(false)}
+    />
+    </>
   );
 }

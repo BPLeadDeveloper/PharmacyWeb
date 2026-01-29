@@ -9,7 +9,6 @@ interface ProfileForm {
   first_name: string;
   last_name: string;
   date_of_birth: string;
-  gender: string;
   emergency_contact_name: string;
   emergency_contact_phone: string;
 }
@@ -20,7 +19,6 @@ export default function CompleteProfile() {
     first_name: "",
     last_name: "",
     date_of_birth: "",
-    gender: "",
     emergency_contact_name: "",
     emergency_contact_phone: "",
   });
@@ -31,7 +29,7 @@ export default function CompleteProfile() {
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (!token) {
-      router.push("/login");
+      router.push("/");
       return;
     }
 
@@ -48,7 +46,6 @@ export default function CompleteProfile() {
             first_name: data.first_name || "",
             last_name: data.last_name || "",
             date_of_birth: data.date_of_birth ? data.date_of_birth.split("T")[0] : "",
-            gender: data.gender || "",
             emergency_contact_name: data.customer?.emergency_contact_name || "",
             emergency_contact_phone: data.customer?.emergency_contact_phone || "",
           });
@@ -56,7 +53,7 @@ export default function CompleteProfile() {
       })
       .catch(() => {
         localStorage.removeItem("token");
-        router.push("/login");
+        router.push("/");
       });
   }, [router]);
 
@@ -156,17 +153,10 @@ export default function CompleteProfile() {
               </div>
               <span className="ml-2 text-sm text-gray-600">Email</span>
             </div>
-            <div className="w-12 h-1 bg-green-500 rounded"></div>
-            <div className="flex items-center">
-              <div className="w-8 h-8 rounded-full bg-green-500 text-white flex items-center justify-center text-sm font-semibold">
-                ✓
-              </div>
-              <span className="ml-2 text-sm text-gray-600">Phone</span>
-            </div>
             <div className="w-12 h-1 bg-[#f57224] rounded"></div>
             <div className="flex items-center">
               <div className="w-8 h-8 rounded-full bg-[#f57224] text-white flex items-center justify-center text-sm font-semibold">
-                3
+                2
               </div>
               <span className="ml-2 text-sm text-gray-600">Profile</span>
             </div>
@@ -222,38 +212,6 @@ export default function CompleteProfile() {
                 className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-[#f57224] text-gray-800 transition"
                 required
               />
-            </div>
-
-            {/* Gender */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Gender
-              </label>
-              <div className="flex space-x-4">
-                {["Male", "Female", "Other"].map((gender) => (
-                  <label
-                    key={gender}
-                    className={`flex-1 flex items-center justify-center px-4 py-3 border-2 rounded-lg cursor-pointer transition ${
-                      form.gender === gender
-                        ? "border-[#f57224] bg-orange-50 text-[#f57224]"
-                        : "border-gray-200 hover:border-gray-300"
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name="gender"
-                      value={gender}
-                      checked={form.gender === gender}
-                      onChange={handleChange}
-                      className="sr-only"
-                    />
-                    <span className="mr-2">
-                      {gender === "Male" ? "👨" : gender === "Female" ? "👩" : "🧑"}
-                    </span>
-                    <span className="font-medium text-gray-700">{gender}</span>
-                  </label>
-                ))}
-              </div>
             </div>
 
             {/* Emergency Contact Section */}
