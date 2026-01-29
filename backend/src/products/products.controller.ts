@@ -2,8 +2,7 @@ import { Body, Controller, Delete, Get, Patch, Post, UseGuards } from "@nestjs/c
 import { ProductsService } from "./products.service";
 import { Roles } from "src/decorators/index";
 import { JwtAuthGuard, RolesGuard } from "src/auth/guards/index";
-import { AddBrandDTORequest, AddBrandDTOReturn } from "./dto/index";
-
+import { AddBrandDTORequest, AddBrandDTOReturn, DeleteBrandDTORequest, GetBrandDTOResponse, UpdateBrandDTORequest, UpdateBrandDTOResponse } from "./dto/index";
 
 
 @Controller('products')
@@ -14,7 +13,7 @@ export class ProductsController {
 
     @Post('create-brand')
     @UseGuards(JwtAuthGuard, RolesGuard)
-    @Roles('ADMIN')
+    @Roles('ADMIN', 'LEAD_PHARMACIST')
     createBrand(@Body() addBrandDTO: AddBrandDTORequest): Promise<AddBrandDTOReturn> {
         return this.productsService.createBrands(addBrandDTO);
     }
@@ -22,21 +21,21 @@ export class ProductsController {
     @Patch('update-brand')
     @UseGuards(JwtAuthGuard, RolesGuard)
     @Roles('ADMIN')
-    updateBrand() {
-        return this.productsService.updateBrands();
+    updateBrand(@Body() updateBrandDTO: UpdateBrandDTORequest): Promise<UpdateBrandDTOResponse> {
+        return this.productsService.updateBrands(updateBrandDTO);
     }
 
     @Delete('delete-brand')
     @UseGuards(JwtAuthGuard, RolesGuard)
     @Roles('ADMIN')
-    deleteBrand() {
-        return this.productsService.deleteBrands();
+    deleteBrand(@Body() deleteBrandDTO: DeleteBrandDTORequest): Promise<GetBrandDTOResponse> {
+        return this.productsService.deleteBrands(deleteBrandDTO);
     }
 
     @Get('get-brands')
     @UseGuards(JwtAuthGuard, RolesGuard)
-    @Roles('ADMIN')
-    getBrands() {
+    @Roles('ADMIN', 'LEAD_PHARMACIST', 'PHARMACIST')
+    getBrands(): Promise<GetBrandDTOResponse[]> {
         return this.productsService.getBrands();
     }
 
