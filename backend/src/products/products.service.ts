@@ -98,6 +98,10 @@ export class ProductsService {
                 }
             });
 
+            if (!deletedBrand) {
+                return Promise.reject(new Error('Brand not found'));
+            }
+
             const returnData = {
                 brandID: deletedBrand.brand_id,
                 brandName: deletedBrand.brand_name,
@@ -105,6 +109,33 @@ export class ProductsService {
                 manufacturerName: deletedBrand?.manufacturer_name,
                 webURL: deletedBrand?.web_url,
                 isActive: deletedBrand?.is_active
+            };
+
+            return Promise.resolve(returnData);
+        } catch (error) {
+            return Promise.reject(error);
+        }
+    }
+
+    async getBrandByID(brandID: number): Promise<GetBrandDTOResponse> {
+        try {
+            const brand = await this.prismaService.brands.findUnique({
+                where: {
+                    brand_id: brandID
+                }
+            });
+
+            if (!brand) {
+                return Promise.reject(new Error('Brand not found'));
+            }
+
+            const returnData = {
+                brandID: brand.brand_id,
+                brandName: brand.brand_name,
+                originCountry: brand?.origin_country,
+                manufacturerName: brand?.manufacturer_name,
+                webURL: brand?.web_url,
+                isActive: brand?.is_active
             };
 
             return Promise.resolve(returnData);

@@ -255,11 +255,13 @@ export class AuthService {
     });
 
     const roles = userRoles.map((ur) => ur.user_roles.role_name);
+    const role_ids = userRoles.map((ur) => ur.user_roles.role_id.toString());
 
-    const payload = { 
-      sub: userId.toString(), 
+    const payload = {
+      sub: userId.toString(),
       email,
       roles,
+      role_ids,
     };
     
     return this.jwtService.sign(payload);
