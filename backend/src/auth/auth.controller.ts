@@ -1,62 +1,152 @@
-import { Controller, Get, Post, Body, UseGuards, Req, Res, HttpStatus } from '@nestjs/common';
+import { Controller, Post, Body, Get, UseGuards, Res } from '@nestjs/common';
 import { AuthService } from './auth.service';
-import { GoogleAuthGuard } from './guards/google-auth.guard';
-import { JwtAuthGuard } from './guards/jwt-auth.guard';
-import { RegisterDto } from './dto/register.dto';
-import { LoginDto } from './dto/login.dto';
-import { ConfigService } from '@nestjs/config';
+import { JwtAuthGuard, RolesGuard } from './guards';
+import { Roles, GetUser } from "../decorators";
+import { RegisterCustomerDto, RegisterAdminDto, RegisterPharmacistDto, LoginDto } from './dto';
 import type { Response } from 'express';
+import type { AuthUser } from './auth.service';
+import { ConfigService } from '@nestjs/config';
 
 @Controller('auth')
 export class AuthController {
   constructor(
     private authService: AuthService,
     private configService: ConfigService,
-  ) {}
+  ) { }
 
-  // Email/Password Registration
-  @Post('register')
-  async register(@Body() registerDto: RegisterDto) {
-    return this.authService.register(registerDto);
+  private setAuthCookie(res: Response, token: string) {
+    const isProd = this.configService.get('NODE_ENV') === 'production';
+
+    res.cookie('access_token', token, {
+      httpOnly: true,
+      secure: isProd, 
+      sameSite: isProd ? 'strict' : 'lax',
+      maxAge: 7 * 24 * 60 * 60 * 1000, 
+      path: '/',
+    });
   }
 
-  // Email/Password Login
+  @Post('register/customer')
+  async registerCustomer(
+    @Body() registerDto: RegisterCustomerDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const result = await this.authService.registerCustomer(registerDto);
+
+    this.setAuthCookie(res, result.token);
+
+    return {
+      message: 'Registration successful',
+      user: result.user,
+    };
+  }
+
+  @Post('register/pharmacist')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  async registerPharmacist(
+    @Body() registerDto: RegisterPharmacistDto,
+    @GetUser() admin: AuthUser,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const result = await this.authService.registerPharmacist(registerDto, admin.id);
+
+    this.setAuthCookie(res, result.token);
+
+    return {
+      message: 'Pharmacist registered successfully',
+      user: result.user,
+    };
+  }
+
+  @Post('register/admin')
+  async registerAdmin(
+    @Body() registerDto: RegisterAdminDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const result = await this.authService.registerAdmin(registerDto);
+
+    this.setAuthCookie(res, result.token);
+
+    return {
+      message: 'Admin registered successfully',
+      user: result.user,
+    };
+  }
+
   @Post('login')
-  async login(@Body() loginDto: LoginDto) {
-    return this.authService.login(loginDto);
+  async login(
+    @Body() loginDto: LoginDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const result = await this.authService.login(loginDto);
+
+    this.setAuthCookie(res, result.token);
+
+    return {
+      message: 'Login successful',
+      user: result.user,
+    };
   }
 
-  // Google OAuth Login
-  @Get('google')
-  @UseGuards(GoogleAuthGuard)
-  async googleAuth() {
-    // Initiates Google OAuth flow
-  }
-
-  @Get('google/callback')
-  @UseGuards(GoogleAuthGuard)
-  async googleAuthRedirect(@Req() req, @Res() res: Response) {
-    const { user, access_token } = await this.authService.googleLogin(req.user);
-    
-    // Redirect to frontend with token
-    const frontendUrl = this.configService.get('FRONTEND_URL');
-    return res.redirect(
-      `${frontendUrl}/auth/callback?token=${access_token}`
-    );
-  }
-
-  // Get Current User Profile
-  @UseGuards(JwtAuthGuard)
   @Get('me')
-  async getProfile(@Req() req) {
-    return req.user;
+  @UseGuards(JwtAuthGuard)
+  async getProfile(@GetUser() user: AuthUser) {
+    return {
+      id: user.id.toString(),
+      email: user.email,
+      phone: user.phone,
+      first_name: user.first_name,
+      last_name: user.last_name,
+      user_type: user.user_type,
+      pharmacist_role: user.pharmacist_role,
+      admin_level: user.admin_level,
+      is_active: user.is_active,
+    };
   }
 
-  // Logout
-  @Get('logout')
-  async logout(@Res() res: Response) {
-    // For stateless JWT, just return success
-    // Frontend will remove the token
-    return res.status(HttpStatus.OK).json({ message: 'Logged out successfully' });
+  @Post('logout')
+  async logout(@Res({ passthrough: true }) res: Response) {
+
+    res.clearCookie('access_token', {
+      httpOnly: true,
+      secure: this.configService.get('NODE_ENV') === 'production',
+      sameSite: this.configService.get('NODE_ENV') === 'production' ? 'strict' : 'lax',
+      path: '/',
+    });
+
+    return {
+      message: 'Logged out successfully'
+    };
+  }
+
+  @Get('test/customer')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('CUSTOMER')
+  testCustomer(@GetUser() user: AuthUser) {
+    return {
+      message: 'Customer endpoint accessed',
+      user: user
+    };
+  }
+
+  @Get('test/pharmacist')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('PHARMACIST')
+  testPharmacist(@GetUser() user: AuthUser) {
+    return {
+      message: 'Pharmacist endpoint accessed',
+      user: user
+    };
+  }
+
+  @Get('test/admin')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  testAdmin(@GetUser() user: AuthUser) {
+    return {
+      message: 'Admin endpoint accessed',
+      user: user
+    };
   }
 }

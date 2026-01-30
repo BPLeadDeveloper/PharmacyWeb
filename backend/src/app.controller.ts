@@ -4,11 +4,4 @@ import { PrismaService } from './prisma/prisma.service';
 @Controller()
 export class AppController {
   constructor(private readonly prisma: PrismaService) {}
-
-  @Get('db-health')
-  async health() {
-    // Tests DB connectivity
-    const result = await this.prisma.users.count();
-    return { ok: true, userCount: result };
-  }
 }
