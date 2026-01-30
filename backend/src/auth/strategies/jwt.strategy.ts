@@ -13,11 +13,12 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   ) {
     super({
       jwtFromRequest: ExtractJwt.fromExtractors([
-        // Extract JWT from httpOnly cookie
+        // from cookie
         (request: Request) => {
           return request?.cookies?.access_token;
         },
-        // Fallback to Authorization header for API clients
+        
+        // from header for postman
         ExtractJwt.fromAuthHeaderAsBearerToken(),
       ]),
       ignoreExpiration: false,
@@ -33,7 +34,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     if (payload.iss !== issuer || payload.aud !== audience) {
       throw new UnauthorizedException("Invalid JWT issuer or audience");
     }
-    
+
     const user = await this.authService.validateUser(
       BigInt(payload.sub),
       payload.user_type as UserType
