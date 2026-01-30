@@ -24,11 +24,9 @@ export class RegisterCustomerDto {
   @IsDateString()
   date_of_birth?: string;
 
-  @IsOptional()
   @IsString()
-  emergency_contact_name?: string;
+  emergency_contact_name: string;
 
-  @IsOptional()
   @IsString()
-  emergency_contact_phone?: string;
+  emergency_contact_phone: string;
 }
