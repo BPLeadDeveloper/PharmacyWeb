@@ -26,7 +26,14 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   async validate(payload: any) {
-    // payload contains: { sub: userId, email, user_type, pharmacist_role?, admin_level? }
+
+    const issuer = this.configService.get<string>("JWT_ISSUER");
+    const audience = this.configService.get<string>("JWT_AUDIENCE");
+
+    if (payload.iss !== issuer || payload.aud !== audience) {
+      throw new UnauthorizedException("Invalid JWT issuer or audience");
+    }
+    
     const user = await this.authService.validateUser(
       BigInt(payload.sub),
       payload.user_type as UserType
